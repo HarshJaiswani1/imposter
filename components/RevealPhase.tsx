@@ -41,7 +41,7 @@ export default function RevealPhase({
 
   return (
     <div className="flex flex-col items-center gap-8">
-      <PhaseHeader round={room.round} category={room.category} />
+      <PhaseHeader round={room.round} category={room.category} imposterCount={room.imposterCount} />
 
       {data?.role === "spectator" ? (
         <div className="glass-panel w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl">
@@ -54,6 +54,7 @@ export default function RevealPhase({
           word={data.word ?? ""}
           categoryLabel={category?.label ?? ""}
           categoryEmoji={category?.emoji ?? ""}
+          fellowImposters={data.fellowImposters}
         />
       ) : (
         <div className="h-72 w-64 animate-pulse rounded-3xl bg-white/5 sm:w-72" />

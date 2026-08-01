@@ -36,10 +36,15 @@ export function fetchRoom(code: string, playerId: string) {
 }
 
 export function fetchMyWord(code: string, playerId: string) {
-  return request<{ role: "normal" | "imposter" | "spectator"; word: string | null; category: string | null }>(
-    `/api/rooms/${code}/word?playerId=${encodeURIComponent(playerId)}`,
-    { method: "GET", cache: "no-store" },
-  );
+  return request<{
+    role: "normal" | "imposter" | "spectator";
+    word: string | null;
+    category: string | null;
+    fellowImposters: string[];
+  }>(`/api/rooms/${code}/word?playerId=${encodeURIComponent(playerId)}`, {
+    method: "GET",
+    cache: "no-store",
+  });
 }
 
 export function startRound(
@@ -47,10 +52,11 @@ export function startRound(
   playerId: string,
   category: string,
   adminPlaying: boolean,
+  imposterCount: number,
 ) {
   return request<{ room: PublicRoom }>(`/api/rooms/${code}/start`, {
     method: "POST",
-    body: JSON.stringify({ playerId, category, adminPlaying }),
+    body: JSON.stringify({ playerId, category, adminPlaying, imposterCount }),
   });
 }
 
@@ -61,10 +67,10 @@ export function callVote(code: string, playerId: string) {
   });
 }
 
-export function castVote(code: string, playerId: string, targetId: string) {
+export function castVote(code: string, playerId: string, targetIds: string[]) {
   return request<{ room: PublicRoom }>(`/api/rooms/${code}/vote`, {
     method: "POST",
-    body: JSON.stringify({ playerId, targetId }),
+    body: JSON.stringify({ playerId, targetIds }),
   });
 }
 

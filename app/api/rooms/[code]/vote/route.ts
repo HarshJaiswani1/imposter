@@ -12,8 +12,10 @@ export async function POST(
     const { code } = await params;
     const body = await req.json().catch(() => ({}));
     const playerId = typeof body.playerId === "string" ? body.playerId : "";
-    const targetId = typeof body.targetId === "string" ? body.targetId : "";
-    const room = await castVote(code, playerId, targetId);
+    const targetIds = Array.isArray(body.targetIds)
+      ? body.targetIds.filter((id: unknown): id is string => typeof id === "string")
+      : [];
+    const room = await castVote(code, playerId, targetIds);
     return noStore({ room: toPublicRoom(room, playerId) });
   } catch (err) {
     return handleApiError(err);

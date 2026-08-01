@@ -6,6 +6,12 @@ import { getCategory } from "@/lib/words";
 import PlayerAvatar from "./PlayerAvatar";
 import RoundSetup from "./RoundSetup";
 
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
 export default function ResultsScreen({
   code,
   playerId,
@@ -19,8 +25,10 @@ export default function ResultsScreen({
   if (!result) return null;
 
   const category = getCategory(result.category);
-  const imposter = room.players.find((p) => p.id === result.actualImposterId);
-  const votedFor = room.players.find((p) => p.id === result.votedImposterId);
+  const imposters = room.players.filter((p) => result.imposterIds.includes(p.id));
+  const caughtNames = room.players.filter((p) => result.caughtIds.includes(p.id)).map((p) => p.name);
+  const escapedNames = room.players.filter((p) => result.escapedIds.includes(p.id)).map((p) => p.name);
+  const accusedNames = room.players.filter((p) => result.accusedIds.includes(p.id)).map((p) => p.name);
   const eligible = room.players.filter((p) => p.playing);
   const maxTally = Math.max(1, ...Object.values(result.tally));
   const sortedByTally = [...eligible].sort(
@@ -29,6 +37,24 @@ export default function ResultsScreen({
   const scoreboard = [...room.players].sort((a, b) => b.score - a.score);
   const audienceWon = !result.imposterWon;
   const me = room.players.find((p) => p.id === playerId);
+  const isMulti = imposters.length > 1;
+
+  let subtitle: string;
+  if (result.tie) {
+    subtitle = isMulti
+      ? "Nobody got enough votes to be accused — every imposter slips away."
+      : "Nobody got enough votes to be accused — the imposter slips away.";
+  } else if (audienceWon) {
+    subtitle = isMulti
+      ? `The room caught every imposter — ${joinNames(caughtNames)}!`
+      : `The room correctly voted out ${joinNames(caughtNames)}.`;
+  } else if (caughtNames.length > 0) {
+    subtitle = `The room caught ${joinNames(caughtNames)} — but ${joinNames(escapedNames)} slipped away unnoticed.`;
+  } else {
+    subtitle = accusedNames.length
+      ? `The room accused ${joinNames(accusedNames)}, but ${isMulti ? "none of them were imposters" : "that wasn't the imposter"}.`
+      : "Nobody was accused.";
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,29 +70,28 @@ export default function ResultsScreen({
       >
         <span className="text-5xl">{audienceWon ? "🕵️" : "🎭"}</span>
         <h1 className="mt-3 font-display text-3xl font-bold">
-          {audienceWon ? "Audience Wins!" : "Imposter Wins!"}
+          {audienceWon ? "Audience Wins!" : isMulti ? "Imposters Win!" : "Imposter Wins!"}
         </h1>
-        <p className="mt-2 text-sm text-white/60">
-          {result.tie
-            ? "The vote ended in a tie — the imposter slips away."
-            : audienceWon
-              ? `The room correctly voted out ${imposter?.name ?? "the imposter"}.`
-              : votedFor
-                ? `The room voted for ${votedFor.name}, but that wasn't the imposter.`
-                : "Nobody was voted out."}
-        </p>
+        <p className="mt-2 text-sm text-white/60">{subtitle}</p>
       </motion.div>
 
       <div className="glass-panel rounded-3xl p-6 shadow-2xl sm:p-8">
         <h2 className="font-display text-lg font-bold">The reveal</h2>
-        <div className="mt-4 flex items-center gap-4">
-          <PlayerAvatar name={imposter?.name ?? "?"} seed={result.actualImposterId} size="lg" />
-          <div>
-            <p className="text-sm text-white/50">The imposter was</p>
-            <p className="font-display text-2xl font-bold text-imposter">
-              {imposter?.name ?? "Unknown"}
-            </p>
-          </div>
+        <div className="mt-4 flex flex-col gap-3">
+          {imposters.map((p) => {
+            const wasCaught = result.caughtIds.includes(p.id);
+            return (
+              <div key={p.id} className="flex items-center gap-4">
+                <PlayerAvatar name={p.name} seed={p.id} size="lg" />
+                <div>
+                  <p className="text-sm text-white/50">
+                    {wasCaught ? "Caught!" : isMulti ? "Got away with it" : "The imposter was"}
+                  </p>
+                  <p className="font-display text-2xl font-bold text-imposter">{p.name}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -87,13 +112,23 @@ export default function ResultsScreen({
 
       <div className="glass-panel rounded-3xl p-6 shadow-2xl sm:p-8">
         <h2 className="font-display text-lg font-bold">Vote breakdown</h2>
+        <p className="mt-1 text-xs text-white/40">
+          {result.accusedIds.length > 0
+            ? `Accused this round: ${joinNames(accusedNames)}`
+            : "Nobody got enough votes to be accused."}
+        </p>
         <div className="mt-4 flex flex-col gap-3">
           {sortedByTally.map((p) => {
             const count = result.tally[p.id] ?? 0;
-            const isImposter = p.id === result.actualImposterId;
+            const isImposter = result.imposterIds.includes(p.id);
+            const wasAccused = result.accusedIds.includes(p.id);
             return (
               <div key={p.id} className="flex items-center gap-3">
-                <PlayerAvatar name={p.name} seed={p.id} size="sm" />
+                <div
+                  className={`rounded-full ${wasAccused ? "ring-2 ring-white/40" : ""}`}
+                >
+                  <PlayerAvatar name={p.name} seed={p.id} size="sm" />
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className={`truncate font-medium ${isImposter ? "text-imposter" : ""}`}>

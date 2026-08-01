@@ -15,7 +15,7 @@ export default function VotingPhase({
 }) {
   return (
     <div className="flex flex-col items-center gap-6">
-      <PhaseHeader round={room.round} category={room.category} />
+      <PhaseHeader round={room.round} category={room.category} imposterCount={room.imposterCount} />
       <div className="w-full max-w-lg">
         <VotingPanel code={code} playerId={playerId} room={room} />
       </div>

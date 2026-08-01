@@ -11,10 +11,17 @@ export interface Player {
 }
 
 export interface RoundResult {
-  votedImposterId: string | null;
-  actualImposterId: string;
-  imposterName: string;
+  /** The top-voted suspects — one pick's worth of ambiguity is widened to include ties. */
+  accusedIds: string[];
+  imposterIds: string[];
+  imposterNames: string[];
+  /** Imposters who were among the accused. */
+  caughtIds: string[];
+  /** Imposters who were not accused — they evaded detection. */
+  escapedIds: string[];
+  /** True only when every imposter was caught. */
   imposterWon: boolean;
+  /** No votes were cast at all — a fully inconclusive round. */
   tie: boolean;
   tally: Record<string, number>;
   word: string;
@@ -31,10 +38,12 @@ export interface Room {
   phase: Phase;
   category: string | null;
   players: Player[];
-  imposterId: string | null;
+  imposterIds: string[];
+  imposterCount: number;
   word: string | null;
   imposterWord: string | null;
-  votes: Record<string, string>;
+  /** Each voter picks exactly `imposterCount` distinct suspects. */
+  votes: Record<string, string[]>;
   votingStartedAt: number | null;
   round: number;
   result: RoundResult | null;
@@ -57,13 +66,14 @@ export interface PublicRoom {
   category: string | null;
   players: PublicPlayer[];
   round: number;
+  imposterCount: number;
   votingStartedAt: number | null;
   result: RoundResult | null;
   you: {
     id: string;
     isAdmin: boolean;
     inRoom: boolean;
-    votedFor: string | null;
+    votes: string[];
   };
   minPlayers: number;
   maxPlayers: number;

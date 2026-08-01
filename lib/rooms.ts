@@ -1,11 +1,20 @@
 import { customAlphabet, nanoid } from "nanoid";
 import { getStore } from "./store";
 import { pickWordPair } from "./words";
+import { MIN_PLAYERS, maxImposters } from "./gameRules";
 import type { Player, PublicRoom, Room, RoundResult } from "./types";
 
 const ROOM_TTL_SECONDS = 6 * 60 * 60; // 6 hours
-const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 16;
+
+function shuffle<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 const roomCodeAlphabet = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 5);
 
@@ -76,7 +85,8 @@ export async function createRoom(adminName: string): Promise<{ room: Room; admin
           playing: true,
         },
       ],
-      imposterId: null,
+      imposterIds: [],
+      imposterCount: 1,
       word: null,
       imposterWord: null,
       votes: {},
@@ -138,6 +148,7 @@ export function toPublicRoom(room: Room, viewerId: string | null): PublicRoom {
     phase: room.phase,
     category: room.category,
     round: room.round,
+    imposterCount: room.imposterCount,
     votingStartedAt: room.votingStartedAt,
     result: room.result,
     minPlayers: MIN_PLAYERS,
@@ -154,7 +165,7 @@ export function toPublicRoom(room: Room, viewerId: string | null): PublicRoom {
       id: viewerId ?? "",
       isAdmin: you?.id === room.adminId,
       inRoom: !!you,
-      votedFor: viewerId ? room.votes[viewerId] ?? null : null,
+      votes: viewerId ? room.votes[viewerId] ?? [] : [],
     },
   };
 }
@@ -170,6 +181,7 @@ export async function startRound(
   adminId: string,
   categoryKey: string,
   adminPlaying: boolean,
+  imposterCount: number,
 ): Promise<Room> {
   const { room } = await mutateRoom(code, (room) => {
     assertAdmin(room, adminId);
@@ -184,17 +196,21 @@ export async function startRound(
       throw new RoomError(`Need at least ${MIN_PLAYERS} playing players to start.`, 400);
     }
 
+    const cap = maxImposters(eligible.length);
+    const count = Math.min(Math.max(1, Math.floor(imposterCount) || 1), cap);
+
     const picked = pickWordPair(categoryKey, room.usedPairs);
     if (!picked) throw new RoomError("Unknown category.", 400);
 
     room.usedPairs.push(picked.pairKey);
     if (room.usedPairs.length > 200) room.usedPairs = room.usedPairs.slice(-100);
 
-    const imposter = eligible[Math.floor(Math.random() * eligible.length)];
+    const imposters = shuffle(eligible).slice(0, count);
 
     room.category = categoryKey;
     room.adminPlaying = adminPlaying;
-    room.imposterId = imposter.id;
+    room.imposterIds = imposters.map((p) => p.id);
+    room.imposterCount = count;
     room.word = picked.word;
     room.imposterWord = picked.imposterWord;
     room.votes = {};
@@ -210,20 +226,28 @@ export async function startRound(
 export async function getMyWord(
   code: string,
   playerId: string,
-): Promise<{ role: "normal" | "imposter" | "spectator"; word: string | null; category: string | null }> {
+): Promise<{
+  role: "normal" | "imposter" | "spectator";
+  word: string | null;
+  category: string | null;
+  fellowImposters: string[];
+}> {
   const room = await getRoom(code);
   const player = room.players.find((p) => p.id === playerId);
   if (!player) throw new RoomError("You're not part of this room.", 403);
   if (room.phase === "lobby" || !room.category) {
-    return { role: "spectator", word: null, category: null };
+    return { role: "spectator", word: null, category: null, fellowImposters: [] };
   }
   if (!player.playing) {
-    return { role: "spectator", word: null, category: room.category };
+    return { role: "spectator", word: null, category: room.category, fellowImposters: [] };
   }
-  if (player.id === room.imposterId) {
-    return { role: "imposter", word: room.imposterWord, category: room.category };
+  if (room.imposterIds.includes(player.id)) {
+    const fellowImposters = room.players
+      .filter((p) => p.id !== player.id && room.imposterIds.includes(p.id))
+      .map((p) => p.name);
+    return { role: "imposter", word: room.imposterWord, category: room.category, fellowImposters };
   }
-  return { role: "normal", word: room.word, category: room.category };
+  return { role: "normal", word: room.word, category: room.category, fellowImposters: [] };
 }
 
 export async function callVote(code: string, adminId: string): Promise<Room> {
@@ -242,33 +266,53 @@ export async function callVote(code: string, adminId: string): Promise<Room> {
 
 function finalize(room: Room): RoundResult {
   const eligible = room.players.filter((p) => p.playing);
+  const K = Math.max(1, room.imposterIds.length);
+
   const tally: Record<string, number> = {};
   eligible.forEach((p) => (tally[p.id] = 0));
-  for (const [voterId, targetId] of Object.entries(room.votes)) {
-    if (tally[targetId] === undefined) continue;
+  for (const [voterId, targets] of Object.entries(room.votes)) {
     if (!eligible.some((p) => p.id === voterId)) continue;
-    tally[targetId] += 1;
+    for (const targetId of targets) {
+      if (tally[targetId] === undefined) continue;
+      tally[targetId] += 1;
+    }
   }
 
   const maxVotes = Math.max(0, ...Object.values(tally));
-  const topPlayers = Object.entries(tally)
-    .filter(([, count]) => count === maxVotes)
-    .map(([id]) => id);
+  const tie = maxVotes === 0;
 
-  const tie = maxVotes === 0 || topPlayers.length !== 1;
-  const votedImposterId = tie ? null : topPlayers[0];
-  const imposterWon = tie || votedImposterId !== room.imposterId;
+  // Take the K most-accused players. If there's a tie for the last spot(s),
+  // everyone tied at that count is included rather than picked arbitrarily.
+  let accusedIds: string[] = [];
+  if (!tie) {
+    const ranked = Object.entries(tally)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1]);
+    const cutoffCount = ranked[Math.min(K, ranked.length) - 1][1];
+    accusedIds = ranked.filter(([, count]) => count >= cutoffCount).map(([id]) => id);
+  }
 
-  const imposter = room.players.find((p) => p.id === room.imposterId);
+  const caughtIds = room.imposterIds.filter((id) => accusedIds.includes(id));
+  const escapedIds = room.imposterIds.filter((id) => !accusedIds.includes(id));
+  const imposterWon = tie || escapedIds.length > 0;
 
+  const imposterNames = room.players
+    .filter((p) => room.imposterIds.includes(p.id))
+    .map((p) => p.name);
+
+  // Every imposter who wasn't accused evaded detection and scores for it.
+  // Genuine audience members (never imposters themselves) score one point
+  // per correct pick in their ballot.
   const scoreDeltas: Record<string, number> = {};
-  if (imposterWon) {
-    if (room.imposterId) scoreDeltas[room.imposterId] = 2;
-  } else {
-    for (const [voterId, targetId] of Object.entries(room.votes)) {
-      if (targetId === room.imposterId && eligible.some((p) => p.id === voterId)) {
-        scoreDeltas[voterId] = (scoreDeltas[voterId] ?? 0) + 1;
-      }
+  for (const id of escapedIds) {
+    scoreDeltas[id] = (scoreDeltas[id] ?? 0) + 2;
+  }
+  for (const [voterId, targets] of Object.entries(room.votes)) {
+    if (room.imposterIds.includes(voterId)) continue;
+    if (!eligible.some((p) => p.id === voterId)) continue;
+    const correctPicks = targets.filter((t) => caughtIds.includes(t)).length;
+    if (correctPicks > 0) {
+      scoreDeltas[voterId] = (scoreDeltas[voterId] ?? 0) + correctPicks;
     }
   }
   for (const [playerId, delta] of Object.entries(scoreDeltas)) {
@@ -277,9 +321,11 @@ function finalize(room: Room): RoundResult {
   }
 
   return {
-    votedImposterId,
-    actualImposterId: room.imposterId ?? "",
-    imposterName: imposter?.name ?? "Unknown",
+    accusedIds,
+    imposterIds: room.imposterIds,
+    imposterNames,
+    caughtIds,
+    escapedIds,
     imposterWon,
     tie,
     tally,
@@ -293,7 +339,7 @@ function finalize(room: Room): RoundResult {
 export async function castVote(
   code: string,
   voterId: string,
-  targetId: string,
+  targetIds: string[],
 ): Promise<Room> {
   const { room } = await mutateRoom(code, (room) => {
     if (room.phase !== "voting") {
@@ -303,15 +349,26 @@ export async function castVote(
     if (!voter || !voter.playing) {
       throw new RoomError("You're not eligible to vote this round.", 403);
     }
-    const target = room.players.find((p) => p.id === targetId);
-    if (!target || !target.playing) {
-      throw new RoomError("Invalid vote target.", 400);
+
+    const requiredPicks = Math.max(1, room.imposterIds.length);
+    const uniqueTargets = new Set(targetIds);
+    if (uniqueTargets.size !== targetIds.length) {
+      throw new RoomError("You can't pick the same suspect twice.", 400);
     }
-    if (targetId === voterId) {
+    if (targetIds.length !== requiredPicks) {
+      throw new RoomError(`Pick exactly ${requiredPicks} suspect(s).`, 400);
+    }
+    if (targetIds.includes(voterId)) {
       throw new RoomError("You can't vote for yourself.", 400);
     }
+    for (const targetId of targetIds) {
+      const target = room.players.find((p) => p.id === targetId);
+      if (!target || !target.playing) {
+        throw new RoomError("Invalid vote target.", 400);
+      }
+    }
 
-    room.votes[voterId] = targetId;
+    room.votes[voterId] = targetIds;
 
     const eligible = room.players.filter((p) => p.playing);
     const allVoted = eligible.every((p) =>

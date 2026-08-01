@@ -14,7 +14,8 @@ export async function POST(
     const adminId = typeof body.playerId === "string" ? body.playerId : "";
     const category = typeof body.category === "string" ? body.category : "";
     const adminPlaying = body.adminPlaying !== false;
-    const room = await startRound(code, adminId, category, adminPlaying);
+    const imposterCount = typeof body.imposterCount === "number" ? body.imposterCount : 1;
+    const room = await startRound(code, adminId, category, adminPlaying, imposterCount);
     return noStore({ room: toPublicRoom(room, adminId) });
   } catch (err) {
     return handleApiError(err);

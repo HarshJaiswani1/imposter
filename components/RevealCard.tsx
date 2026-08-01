@@ -8,11 +8,13 @@ export default function RevealCard({
   word,
   categoryLabel,
   categoryEmoji,
+  fellowImposters = [],
 }: {
   role: "normal" | "imposter";
   word: string;
   categoryLabel: string;
   categoryEmoji: string;
+  fellowImposters?: string[];
 }) {
   const [holding, setHolding] = useState(false);
   const [everRevealed, setEverRevealed] = useState(false);
@@ -110,13 +112,20 @@ export default function RevealCard({
                     Everyone else shares a word. Yours is close, but not quite it — blend in.
                   </p>
                   <p className="mt-2 font-display text-2xl font-bold text-white sm:text-3xl">{word}</p>
+                  {fellowImposters.length > 0 && (
+                    <p className="mt-2 text-xs text-white/50">
+                      Teamed up with{" "}
+                      <span className="font-semibold text-imposter">{fellowImposters.join(", ")}</span> —
+                      they got the same word as you.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
                   <span className="mt-2 text-xs text-white/40">Your word is</span>
                   <p className="font-display text-3xl font-bold text-white sm:text-4xl">{word}</p>
                   <p className="mt-2 text-sm text-white/50">
-                    One player has a different word. Find them before they blend in.
+                    One or more players have a different word. Find them before they blend in.
                   </p>
                 </>
               )}
