@@ -83,14 +83,14 @@ export default function RevealCard({
             transition={{ duration: 0.15 }}
             onPointerUp={endHold}
             onPointerCancel={endHold}
-            className="no-select fixed inset-0 z-50 flex select-none items-center justify-center bg-black/92 p-6 backdrop-blur-md"
+            className="no-select fixed inset-0 z-50 flex select-none items-center justify-center bg-black/92 p-4 backdrop-blur-md sm:p-6"
           >
             <motion.div
               initial={{ scale: 0.85, opacity: 0, rotateX: -15 }}
               animate={{ scale: 1, opacity: 1, rotateX: 0 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className={`flex w-full max-w-sm flex-col items-center gap-3 rounded-3xl border p-10 text-center shadow-2xl ${
+              className={`flex w-full max-w-sm flex-col items-center gap-3 rounded-3xl border p-6 text-center shadow-2xl sm:p-10 ${
                 isImposter
                   ? "border-imposter/40 bg-gradient-to-b from-imposter/15 to-transparent"
                   : "border-accent/40 bg-gradient-to-b from-accent/15 to-transparent"
@@ -109,12 +109,12 @@ export default function RevealCard({
                   <p className="text-sm text-white/60">
                     Everyone else shares a word. Yours is close, but not quite it — blend in.
                   </p>
-                  <p className="mt-2 font-display text-3xl font-bold text-white">{word}</p>
+                  <p className="mt-2 font-display text-2xl font-bold text-white sm:text-3xl">{word}</p>
                 </>
               ) : (
                 <>
                   <span className="mt-2 text-xs text-white/40">Your word is</span>
-                  <p className="font-display text-4xl font-bold text-white">{word}</p>
+                  <p className="font-display text-3xl font-bold text-white sm:text-4xl">{word}</p>
                   <p className="mt-2 text-sm text-white/50">
                     One player has a different word. Find them before they blend in.
                   </p>

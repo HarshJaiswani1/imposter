@@ -28,7 +28,7 @@ export default function RoomClient({ code }: { code: string }) {
     return (
       <>
         <BackgroundFX />
-        <div className="flex min-h-[70vh] flex-col items-center justify-center gap-3 px-4 text-center">
+        <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-3 px-4 text-center">
           <span className="text-4xl">🕳️</span>
           <h1 className="font-display text-xl font-bold">Room not found</h1>
           <p className="max-w-xs text-sm text-white/50">
@@ -49,7 +49,7 @@ export default function RoomClient({ code }: { code: string }) {
     return (
       <>
         <BackgroundFX />
-        <div className="flex min-h-[70vh] items-center justify-center">
+        <div className="flex min-h-[70dvh] items-center justify-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-accent" />
         </div>
       </>
@@ -61,8 +61,8 @@ export default function RoomClient({ code }: { code: string }) {
   return (
     <>
       <BackgroundFX />
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-8 sm:py-12">
-        <header className="mb-8 flex items-center justify-between">
+      <div className="safe-bottom mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-6 sm:pt-10">
+        <header className="safe-top mb-6 flex items-center justify-between gap-3 sm:mb-8">
           <Link href="/" className="font-display text-lg font-bold tracking-tight">
             🎭 Imposter
           </Link>

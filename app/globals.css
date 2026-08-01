@@ -25,13 +25,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
-  background: radial-gradient(ellipse 80% 60% at 15% -10%, rgba(167, 139, 250, 0.25), transparent),
-    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(34, 211, 238, 0.18), transparent),
-    radial-gradient(ellipse 60% 60% at 50% 110%, rgba(251, 113, 133, 0.12), transparent),
-    var(--background);
+  /* Solid color only — decorative gradients live in the fixed BackgroundFX
+     layer instead. A gradient painted on body's own box tiles/repeats once
+     the page grows taller than a single viewport (very common on mobile,
+     where content stacks vertically), which looked like a seam/second page
+     while scrolling. A `position: fixed` layer is pinned to the viewport
+     and can never repeat like that. */
+  background: var(--background);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   color: var(--foreground);
+  overflow-x: hidden;
 }
 
 .font-display {
@@ -105,4 +113,12 @@ body {
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
+}
+
+/* Keep content clear of notches / the home indicator on phones. */
+.safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+.safe-bottom {
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
 }

@@ -74,11 +74,11 @@ export default function ResultsScreen({
             <p className="text-xs uppercase tracking-widest text-white/40">
               {category?.emoji} Everyone&apos;s word
             </p>
-            <p className="mt-2 font-display text-xl font-bold">{result.word}</p>
+            <p className="mt-2 font-display text-lg font-bold sm:text-xl">{result.word}</p>
           </div>
           <div className="rounded-2xl border border-imposter/20 bg-imposter/10 p-4 text-center">
             <p className="text-xs uppercase tracking-widest text-imposter/70">Imposter&apos;s word</p>
-            <p className="mt-2 font-display text-xl font-bold text-imposter">
+            <p className="mt-2 font-display text-lg font-bold text-imposter sm:text-xl">
               {result.imposterWord}
             </p>
           </div>

@@ -25,7 +25,7 @@ export default function JoinGate({ code }: { code: string }) {
   }
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center px-4">
+    <div className="flex min-h-[70dvh] items-center justify-center px-4">
       <form
         onSubmit={handleJoin}
         className="glass-panel w-full max-w-sm rounded-3xl p-8 shadow-2xl"
